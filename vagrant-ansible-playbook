@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <playbook>"
+    exit 1
+fi
+
+INVENTORY=.vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
+
+if [ -f "$INVENTORY" ]; then
+    IFS=' ' read name host port user key_file <<< "$(grep -e '^[a-zA-Z]' $INVENTORY)"
+
+    ANSIBLE_USER=$(echo $user| sed -e 's/=/*/' | cut -f2 -d\*)
+    PRIVATE_KEY=$(echo $key_file| sed -e 's/=/*/' | cut -f2 -d\*)
+else
+    INVENTORY=inventory
+    if [ ! -f "$INVENTORY" ]; then
+        echo "A file named '$INVENTORY' must exist."
+        echo "Either run this at the top level of a Vagrant repo or provide an inventory file."
+        exit 1
+    fi
+    PRIVATE_KEY=$(vagrant ssh-config | grep IdentityFile | sed -e 's/ *IdentityFile *//' | sed -e 's/"//g')
+    ANSIBLE_USER=vagrant
+fi
+
+ANSIBLE_HOST_KEY_CHECKING=false ansible-playbook --user=$ANSIBLE_USER --connection=ssh --private-key="$PRIVATE_KEY" -i $INVENTORY -b "$@"
